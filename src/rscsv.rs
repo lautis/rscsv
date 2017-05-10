@@ -69,8 +69,7 @@ ruby! {
         def generate_line(row: VecWrap<String>) -> String {
             let mut writer = csv::Writer::from_memory();
             writer.write(row.0.into_iter()).unwrap();
-            let result = writer.as_string();
-            return result.to_owned();
+            return writer.into_string();
         }
 
         def generate_lines(rows: VecWrap<VecWrap<String>>) -> String {
@@ -81,8 +80,7 @@ ruby! {
                 writer.write(row.0.into_iter()).unwrap();
             }
 
-            let result = writer.as_string();
-            return result.to_owned();
+            return writer.into_string();
         }
     }
 }
