@@ -47,11 +47,40 @@ impl ToRust<VecWrap<String>> for CheckedValue<VecWrap<String>>
     }
 }
 
+impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
+    where VALUE: UncheckedValue<VecWrap<String>>,
+          CheckedValue<VecWrap<String>>: ToRust<VecWrap<String>>
+{
+    fn to_rust(self) -> VecWrap<VecWrap<String>> {
+        let mut vec: Vec<VecWrap<String>> = Vec::new();
+        let len = unsafe { sys::RARRAY_LEN(self.inner) };
+        let ptr = unsafe { sys::RARRAY_PTR(self.inner) };
+        for i in 0..len {
+            let val = unsafe { *ptr.offset(i) };
+            let checked = val.to_checked().unwrap();
+            vec.push(checked.to_rust());
+        }
+        return VecWrap(vec);
+    }
+}
+
 ruby! {
     class RscsvWriter {
         def generate_line(row: VecWrap<String>) -> String {
             let mut writer = csv::Writer::from_memory();
             writer.write(row.0.into_iter()).unwrap();
+            let result = writer.as_string();
+            return result.to_owned();
+        }
+
+        def generate_lines(rows: VecWrap<VecWrap<String>>) -> String {
+            let mut writer = csv::Writer::from_memory();
+            let vec = rows.0;
+
+            for row in vec.into_iter() {
+                writer.write(row.0.into_iter()).unwrap();
+            }
+
             let result = writer.as_string();
             return result.to_owned();
         }
