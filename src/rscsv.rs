@@ -13,7 +13,6 @@ impl<T> UncheckedValue<VecWrap<T>> for VALUE
 {
     fn to_checked(self) -> CheckResult<VecWrap<T>> {
         if unsafe { sys::RB_TYPE_P(self, sys::T_ARRAY) } {
-            // TODO: Make sure we can actually do the conversions for the values.
             let len = unsafe { sys::RARRAY_LEN(self) };
             let ptr = unsafe { sys::RARRAY_PTR(self) };
             for i in 0..len {
