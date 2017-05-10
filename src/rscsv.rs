@@ -35,9 +35,9 @@ impl ToRust<VecWrap<String>> for CheckedValue<VecWrap<String>>
           CheckedValue<String>: ToRust<String>
 {
     fn to_rust(self) -> VecWrap<String> {
-        let mut vec: Vec<String> = Vec::new();
         let len = unsafe { sys::RARRAY_LEN(self.inner) };
         let ptr = unsafe { sys::RARRAY_PTR(self.inner) };
+        let mut vec: Vec<String> = Vec::with_capacity(len as usize);
         for i in 0..len {
             let val = unsafe { *ptr.offset(i) };
             let checked = val.to_checked().unwrap();
@@ -52,9 +52,9 @@ impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
           CheckedValue<VecWrap<String>>: ToRust<VecWrap<String>>
 {
     fn to_rust(self) -> VecWrap<VecWrap<String>> {
-        let mut vec: Vec<VecWrap<String>> = Vec::new();
         let len = unsafe { sys::RARRAY_LEN(self.inner) };
         let ptr = unsafe { sys::RARRAY_PTR(self.inner) };
+        let mut vec: Vec<VecWrap<String>> = Vec::with_capacity(len as usize);
         for i in 0..len {
             let val = unsafe { *ptr.offset(i) };
             let checked = val.to_checked().unwrap();
