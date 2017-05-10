@@ -77,7 +77,7 @@ ruby! {
             let mut writer = csv::Writer::from_memory();
             let vec = rows.0;
 
-            for row in vec.into_iter() {
+            for row in vec {
                 writer.write(row.0.into_iter()).unwrap();
             }
 
