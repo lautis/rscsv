@@ -9,8 +9,8 @@ Gem::Specification.new do |spec|
   spec.authors = ['Ville Lautanala']
   spec.email = ['lautis@gmail.com']
 
-  spec.summary = %q{Rust-powered CSV}
-  spec.description   = %q{Rust-powered CSV}
+  spec.summary = 'Rust-powered CSV'
+  spec.description = %q{Fast CSV using Rust extensions. Currently only writes CSV.}
   spec.homepage = 'https://github.com/lautis/rscsv'
   spec.license = 'MIT'
 
