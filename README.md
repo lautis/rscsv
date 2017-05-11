@@ -2,6 +2,8 @@
 
 Fast CSV using Rust extensions. Currently writing CSV is implemented.
 
+[![Build Status](https://travis-ci.org/lautis/rscsv.svg?branch=master)](https://travis-ci.org/lautis/rscsv)
+
 ## Installation
 
 This gem requires Rust (~> 1.17) and Cargo to be installed. With those
