@@ -4,5 +4,4 @@ require 'rscsv/version'
 
 module Rscsv
   Writer = RscsvWriter
-  # Your code goes here...
 end
