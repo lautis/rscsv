@@ -1,5 +1,5 @@
 all:
-	rake helix:build
+	rake
 clean:
 	rm -rf ../target
 
