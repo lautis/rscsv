@@ -2,6 +2,7 @@
 extern crate helix;
 extern crate csv;
 
+use std::error::Error;
 use helix::sys;
 use helix::sys::VALUE;
 use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust};
@@ -64,23 +65,31 @@ impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
     }
 }
 
+fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> {
+    let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+    for row in rows.0 {
+        wtr.write_record(&(row.0))?;
+    }
+
+    return Ok(String::from_utf8(wtr.into_inner()?)?);
+}
+
 ruby! {
     class RscsvWriter {
         def generate_line(row: VecWrap<String>) -> String {
-            let mut writer = csv::Writer::from_memory();
-            writer.write(row.0.into_iter()).unwrap();
-            return writer.into_string();
+            let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+            let result = wtr.write_record(&(row.0));
+            match result {
+                Err(_) => throw!("Error generating csv"),
+                Ok(_) => return String::from_utf8(wtr.into_inner().unwrap()).unwrap(),
+            };
         }
 
         def generate_lines(rows: VecWrap<VecWrap<String>>) -> String {
-            let mut writer = csv::Writer::from_memory();
-            let vec = rows.0;
-
-            for row in vec {
-                writer.write(row.0.into_iter()).unwrap();
+            match generate_lines(rows) {
+                Err(_) => throw!("Error generating csv"),
+                Ok(csv) => csv
             }
-
-            return writer.into_string();
         }
     }
 }
