@@ -8,5 +8,5 @@ authors = ["Ville Lautanala <lautis@gmail.com>"]
 crate-type = ["cdylib"]
 
 [dependencies]
-helix = "0.6.0"
+helix = "0.6.1"
 csv = "0.15.0"

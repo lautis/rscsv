@@ -3,7 +3,7 @@ name = "rscsv"
 version = "0.1.0"
 dependencies = [
  "csv 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "helix 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -33,13 +33,13 @@ dependencies = [
 
 [[package]]
 name = "helix"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cslice 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cstr-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
- "libcruby-sys 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libcruby-sys 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -49,7 +49,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libcruby-sys"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -73,8 +73,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum cslice 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0f8cb7306107e4b10e64994de6d3274bd08996a7c1322a27b86482392f96be0a"
 "checksum cstr-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "db53fddba18cdd35477a7213a3ef6acfbfa333c31b42ce019e544c4a1420a06f"
 "checksum csv 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7ef22b37c7a51c564a365892c012dc0271221fdcc64c69b19ba4d6fa8bd96d9c"
-"checksum helix 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4b3d0b8579a68e79a629d9c2f4717dbf5e2b467a7d7afb38c737d573d46331ac"
+"checksum helix 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b97612e592273062bb127433a22b201c9b58375c95fc7ace355ee2fc6be61ebe"
 "checksum libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)" = "babb8281da88cba992fa1f4ddec7d63ed96280a1a53ec9b919fd37b53d71e502"
-"checksum libcruby-sys 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3bf276325da1f1b20cd68108b33c02dfcad26ff4f4d7fdac4cd2a5aac8f04ae5"
+"checksum libcruby-sys 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ae575f064157bc55bb543589971959e3a0163fd49be03fef4c1f3440146114"
 "checksum memchr 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1dbccc0e46f1ea47b9f17e6d67c5a96bd27030519c519c9c91327e31275a47b4"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
