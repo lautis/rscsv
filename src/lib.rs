@@ -5,7 +5,7 @@ extern crate csv;
 use std::error::Error;
 use helix::sys;
 use helix::sys::VALUE;
-use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust, ToRuby};
+use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust};
 
 struct VecWrap<T>(Vec<T>);
 
@@ -72,24 +72,6 @@ extern "C" {
     pub fn rb_ary_push(ary: VALUE, item: VALUE) -> VALUE;
 }
 
-impl ToRuby for VecWrap<csv::StringRecord> {
-    fn to_ruby(self) -> VALUE {
-        let ary = unsafe { rb_ary_new_capa(self.0.len() as isize) };
-        for row in self.0 {
-            let inner_array = unsafe { rb_ary_new_capa(row.len() as isize) };
-            for column in row.iter() {
-                unsafe {
-                    rb_ary_push(inner_array, column.to_ruby());
-                }
-            }
-            unsafe {
-                rb_ary_push(ary, inner_array);
-            }
-        }
-        ary
-    }
-}
-
 fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
     for row in rows.0 {
@@ -99,22 +81,41 @@ fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> 
     return Ok(String::from_utf8(wtr.into_inner()?)?);
 }
 
-fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
+fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
+    let inner_array = unsafe { rb_ary_new_capa(record.len() as isize) };
+    for column in record.iter() {
+        unsafe {
+            let column_value = sys::rb_utf8_str_new(column.as_ptr() as *const i8,
+                                                    column.len() as i64);
+            rb_ary_push(inner_array, column_value);
+        }
+    }
+    return inner_array;
+}
+
+fn parse_csv(data: &[u8]) -> Result<VALUE, csv::Error> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
-        .from_reader(data.as_bytes());
-    let records = reader
-        .records()
-        .collect::<Result<Vec<csv::StringRecord>, csv::Error>>();
-    return records;
+        .from_reader(data);
+
+    let value = unsafe { rb_ary_new_capa(0) };
+    let mut record = csv::ByteRecord::new();
+
+    while reader.read_byte_record(&mut record)? {
+        let inner_array = record_to_ruby(&record);
+        unsafe {
+            rb_ary_push(value, inner_array);
+        }
+    }
+    return Ok(value);
 }
 
 ruby! {
     class RscsvReader {
-        def parse(data: String) -> VecWrap<csv::StringRecord> {
-            match parse_csv(data) {
+        def parse(data: String) -> VALUE {
+            match parse_csv(data.as_bytes()) {
                 Err(_) => throw!("Error parsing CSV"),
-                Ok(result) => return VecWrap(result)
+                Ok(result) => return result
             };
         }
     }
