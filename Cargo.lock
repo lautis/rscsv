@@ -2,7 +2,7 @@
 name = "rscsv"
 version = "0.1.0"
 dependencies = [
- "csv 1.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "csv 1.0.0-beta.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "helix 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -18,16 +18,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "csv"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "csv-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "csv-core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "csv-core"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "memchr 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -40,13 +40,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cslice 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cstr-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "libcruby-sys 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "libc"
-version = "0.2.22"
+version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -54,7 +54,7 @@ name = "libcruby-sys"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -62,21 +62,21 @@ name = "memchr"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "serde"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum cslice 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0f8cb7306107e4b10e64994de6d3274bd08996a7c1322a27b86482392f96be0a"
 "checksum cstr-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "db53fddba18cdd35477a7213a3ef6acfbfa333c31b42ce019e544c4a1420a06f"
-"checksum csv 1.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)" = "81675dd89651e2aa0989e6a5249dc5c5bcfc13772baec7f9652208e7691e0955"
-"checksum csv-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6a11ab3094dd197341f9d66753789a5cdf29ce35450a7d6e7968024e2d44519c"
+"checksum csv 1.0.0-beta.3 (registry+https://github.com/rust-lang/crates.io-index)" = "158edc15f3da84af2ae2689ab84157f7f94a21dff3dec455320cf44be8963433"
+"checksum csv-core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ed4919aaefb12f555bb4e34aa6415b5db7e20e01e517427f13c2bde286ae9b53"
 "checksum helix 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b97612e592273062bb127433a22b201c9b58375c95fc7ace355ee2fc6be61ebe"
-"checksum libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)" = "babb8281da88cba992fa1f4ddec7d63ed96280a1a53ec9b919fd37b53d71e502"
+"checksum libc 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)" = "e7eb6b826bfc1fdea7935d46556250d1799b7fe2d9f7951071f4291710665e3e"
 "checksum libcruby-sys 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ae575f064157bc55bb543589971959e3a0163fd49be03fef4c1f3440146114"
 "checksum memchr 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1dbccc0e46f1ea47b9f17e6d67c5a96bd27030519c519c9c91327e31275a47b4"
-"checksum serde 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c0c3d79316a6051231925504f6ef893d45088e8823c77a8331a3dcf427ee9087"
+"checksum serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)" = "c2f530d36fb84ec48fb7146936881f026cdbf4892028835fd9398475f82c1bb4"
