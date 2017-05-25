@@ -11,6 +11,10 @@ rows = (0...1000).map do
   (0...10).map { SecureRandom.hex }
 end
 
+csv_string = CSV.generate do |csv|
+  rows.each { |row| csv << row }
+end
+
 Benchmark.ips do |x|
   x.report('Ruby CSV') do |times|
     times.times do
@@ -22,6 +26,20 @@ Benchmark.ips do |x|
 
   x.report('rscsv') do |times|
     times.times { Rscsv::Writer.generate_lines(rows) }
+  end
+
+  x.compare!
+end
+
+Benchmark.ips do |x|
+  x.report('Ruby CSV') do |times|
+    times.times do
+      CSV.parse(csv_string)
+    end
+  end
+
+  x.report('rscsv') do |times|
+    times.times { Rscsv::Reader.parse(csv_string) }
   end
 
   x.compare!

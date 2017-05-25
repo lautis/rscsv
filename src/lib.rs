@@ -5,7 +5,7 @@ extern crate csv;
 use std::error::Error;
 use helix::sys;
 use helix::sys::VALUE;
-use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust};
+use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust, ToRuby};
 
 struct VecWrap<T>(Vec<T>);
 
@@ -65,6 +65,31 @@ impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
     }
 }
 
+#[cfg_attr(windows, link(name="helix-runtime"))]
+extern "C" {
+    pub fn rb_ary_new_capa(capa: isize) -> VALUE;
+    pub fn rb_ary_entry(ary: VALUE, offset: isize) -> VALUE;
+    pub fn rb_ary_push(ary: VALUE, item: VALUE) -> VALUE;
+}
+
+impl ToRuby for VecWrap<csv::StringRecord> {
+    fn to_ruby(self) -> VALUE {
+        let ary = unsafe { rb_ary_new_capa(self.0.len() as isize) };
+        for row in self.0 {
+            let inner_array = unsafe { rb_ary_new_capa(row.len() as isize) };
+            for column in row.iter() {
+                unsafe {
+                    rb_ary_push(inner_array, column.to_ruby());
+                }
+            }
+            unsafe {
+                rb_ary_push(ary, inner_array);
+            }
+        }
+        ary
+    }
+}
+
 fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
     for row in rows.0 {
@@ -74,7 +99,25 @@ fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> 
     return Ok(String::from_utf8(wtr.into_inner()?)?);
 }
 
+fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(data.as_bytes());
+    let records = reader
+        .records()
+        .collect::<Result<Vec<csv::StringRecord>, csv::Error>>();
+    return records;
+}
+
 ruby! {
+    class RscsvReader {
+        def parse(data: String) -> VecWrap<csv::StringRecord> {
+            match parse_csv(data) {
+                Err(_) => throw!("Error parsing CSV"),
+                Ok(result) => return VecWrap(result)
+            };
+        }
+    }
     class RscsvWriter {
         def generate_line(row: VecWrap<String>) -> String {
             let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
