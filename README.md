@@ -1,6 +1,7 @@
 # Rscsv
 
-Fast CSV using Rust extensions. Currently writing CSV is implemented.
+Fast CSV using Rust extensions. Can read arrays of arrays from strings and write
+strings from arrays of arrays.
 
 [![Build Status](https://travis-ci.org/lautis/rscsv.svg?branch=master)](https://travis-ci.org/lautis/rscsv)
 

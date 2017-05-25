@@ -10,8 +10,7 @@ Gem::Specification.new do |spec|
   spec.email = ['lautis@gmail.com']
 
   spec.summary = 'Rust-powered CSV'
-  spec.description = 'Fast CSV using Rust extensions.' \
-    'Currently only writes CSV.'
+  spec.description = 'Fast CSV using Rust extensions.'
   spec.homepage = 'https://github.com/lautis/rscsv'
   spec.license = 'MIT'
 
@@ -23,7 +22,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
   spec.extensions = Dir['ext/extconf.rb']
 
-  spec.add_dependency 'helix_runtime', '~> 0.6.1'
+  spec.add_dependency 'helix_runtime', '0.6.1'
   spec.add_dependency 'rake', '>= 10.0'
   spec.add_development_dependency 'bundler', '~> 1.14'
   spec.add_development_dependency 'rspec', '~> 3.0'
