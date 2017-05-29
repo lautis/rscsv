@@ -6,6 +6,7 @@ use std::error::Error;
 use helix::sys;
 use helix::sys::VALUE;
 use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust, ToRuby};
+use helix::libc::c_int;
 
 struct VecWrap<T>(Vec<T>);
 
@@ -70,6 +71,8 @@ extern "C" {
     pub fn rb_ary_new_capa(capa: isize) -> VALUE;
     pub fn rb_ary_entry(ary: VALUE, offset: isize) -> VALUE;
     pub fn rb_ary_push(ary: VALUE, item: VALUE) -> VALUE;
+    pub fn rb_block_given_p() -> c_int;
+    pub fn rb_yield(value: VALUE);
 }
 
 impl ToRuby for VecWrap<csv::StringRecord> {
@@ -99,6 +102,35 @@ fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> 
     return Ok(String::from_utf8(wtr.into_inner()?)?);
 }
 
+fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
+    let inner_array = unsafe { rb_ary_new_capa(record.len() as isize) };
+    for column in record.iter() {
+        unsafe {
+            let column_value = sys::rb_utf8_str_new(column.as_ptr() as *const i8,
+                                                    column.len() as i64);
+            rb_ary_push(inner_array, column_value);
+        }
+    }
+    return inner_array;
+}
+
+fn yield_csv(data: String) -> Result<(), csv::Error> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(data.as_bytes());
+
+    let mut record = csv::ByteRecord::new();
+
+    while reader.read_byte_record(&mut record)? {
+        let inner_array = record_to_ruby(&record);
+        unsafe {
+            rb_yield(inner_array);
+        }
+    }
+
+    return Ok(());
+}
+
 fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
@@ -111,6 +143,12 @@ fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
 
 ruby! {
     class RscsvReader {
+        def each(data: String) {
+            match yield_csv(data) {
+                Err(_) => throw!("Error parsing CSV"),
+                Ok(_) => ()
+            }
+        }
         def parse(data: String) -> VecWrap<csv::StringRecord> {
             match parse_csv(data) {
                 Err(_) => throw!("Error parsing CSV"),
