@@ -3,8 +3,9 @@ extern crate helix;
 extern crate csv;
 
 use std::error::Error;
+use std::io::Read;
 use helix::sys;
-use helix::sys::VALUE;
+use helix::sys::{VALUE, ID};
 use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust, ToRuby};
 use helix::libc::c_int;
 
@@ -66,6 +67,9 @@ impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
     }
 }
 
+
+
+
 #[cfg_attr(windows, link(name="helix-runtime"))]
 extern "C" {
     pub fn rb_ary_new_capa(capa: isize) -> VALUE;
@@ -73,6 +77,7 @@ extern "C" {
     pub fn rb_ary_push(ary: VALUE, item: VALUE) -> VALUE;
     pub fn rb_block_given_p() -> c_int;
     pub fn rb_yield(value: VALUE);
+    pub fn rb_funcall(value: VALUE, name: ID, nargs: c_int, ...) -> VALUE;
 }
 
 impl ToRuby for VecWrap<csv::StringRecord> {
@@ -114,10 +119,86 @@ fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
     return inner_array;
 }
 
-fn yield_csv(data: String) -> Result<(), csv::Error> {
+
+impl UncheckedValue<Enumerator> for VALUE {
+    fn to_checked(self) -> CheckResult<Enumerator> {
+        Ok(unsafe { CheckedValue::new(self) })
+    }
+}
+
+impl ToRust<Enumerator> for CheckedValue<Enumerator> {
+    fn to_rust(self) -> Enumerator {
+        Enumerator { value: self.inner }
+    }
+}
+
+struct Enumerator {
+    value: VALUE,
+}
+
+#[derive(Clone)]
+struct EnumeratorRead {
+    value: VALUE,
+    next: Option<Vec<u8>>,
+}
+
+impl EnumeratorRead {
+    fn new(value: VALUE) -> EnumeratorRead {
+        EnumeratorRead {
+            value: value,
+            next: None,
+        }
+    }
+
+    fn read_and_store_overflow(&mut self, buf: &mut [u8], value: &[u8]) -> std::io::Result<usize> {
+        if value.len() > buf.len() {
+            match value.split_at(buf.len()) {
+                (current, next) => {
+                    for (index, c) in current.iter().enumerate() {
+                        buf[index] = *c;
+                    }
+                    self.next = Some(next.to_vec());
+                    Ok(current.len())
+                }
+            }
+
+        } else {
+            for (index, value) in value.iter().enumerate() {
+                buf[index] = *value;
+            }
+            self.next = None;
+            Ok(value.len() as usize)
+        }
+    }
+
+    fn read_from_external(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let next = unsafe {
+            rb_funcall(self.value,
+                       sys::rb_intern("next\0".as_ptr() as *const i8),
+                       0)
+        };
+        let size = unsafe { sys::RSTRING_LEN(next) };
+        let ptr = unsafe { sys::RSTRING_PTR(next) };
+        let slice = unsafe { std::slice::from_raw_parts(ptr as *const u8, size as usize) };
+
+        self.read_and_store_overflow(buf, slice)
+    }
+}
+
+impl Read for EnumeratorRead {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self.clone().next {
+            Some(inner) => self.read_and_store_overflow(buf, &inner),
+            None => self.read_from_external(buf),
+        }
+    }
+}
+
+
+fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
-        .from_reader(data.as_bytes());
+        .from_reader(EnumeratorRead::new(data.value));
 
     let mut record = csv::ByteRecord::new();
 
@@ -143,7 +224,7 @@ fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
 
 ruby! {
     class RscsvReader {
-        def each(data: String) {
+        def each_internal(data: Enumerator) {
             match yield_csv(data) {
                 Err(_) => throw!("Error parsing CSV"),
                 Ok(_) => ()

@@ -24,8 +24,13 @@ Rscsv::Writer.generate_lines([['1', '2', '3'], ['3', '4', '5']])
 Rscsv::Writer.generate_line(['1', '2', '3'])
 # => 1,2,3\n
 
-Rscsv::Reader.parse("1,2,3\n4,5,6")
+Rscsv::Reader.parse("1,2,3\n4,5,6\n")
 # => [["1", "2", "3"], ["4", "5", "6"]]
+
+# Streaming from Enumerator
+Rscsv::Reader.each(["1,2,3\n","4,5,6\n"].each) do |row|
+  # yields ["1", "2", "3"] and ["4", "5", "6"]
+end
 ```
 
 This is ~3x faster than using native Ruby `CSV.generate` or `CSV.parse`.
