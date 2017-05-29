@@ -21,7 +21,16 @@ RSpec.describe Rscsv::Reader do
 
   describe '.each' do
     it 'yields results' do
-      expect(Rscsv::Reader.to_enum(:each, data).to_a).to eq(CSV.parse(data))
+      expect(Rscsv::Reader.to_enum(:each, data.each_char).to_a)
+        .to eq(CSV.parse(data))
+    end
+
+    it 'handles when chunk size is bigger than buffer size' do
+      a = 'a' * 128 * 1024
+      b = 'b' * 128 * 1024
+      csv = "foo,bar\n#{a},#{b}\n"
+      expect(Rscsv::Reader.to_enum(:each, [csv].each).to_a)
+        .to eq(CSV.parse(csv))
     end
   end
 end
