@@ -4,6 +4,7 @@ extern crate csv;
 
 use std::error::Error;
 use std::io::Read;
+use std::slice::from_raw_parts;
 use helix::sys;
 use helix::sys::{VALUE, ID};
 use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust, ToRuby};
@@ -16,10 +17,8 @@ impl<T> UncheckedValue<VecWrap<T>> for VALUE
 {
     fn to_checked(self) -> CheckResult<VecWrap<T>> {
         if unsafe { sys::RB_TYPE_P(self, sys::T_ARRAY) } {
-            let len = unsafe { sys::RARRAY_LEN(self) };
-            let ptr = unsafe { sys::RARRAY_PTR(self) };
-            for i in 0..len {
-                let val = unsafe { *ptr.offset(i) };
+            let slice = ruby_array_to_slice(self);
+            for val in slice.iter() {
                 if let Err(error) = val.to_checked() {
                     return Err(format!("Failed to convert value for Vec<T>: {}", error));
                 }
@@ -33,20 +32,23 @@ impl<T> UncheckedValue<VecWrap<T>> for VALUE
     }
 }
 
+fn ruby_array_to_slice<'a>(array: VALUE) -> &'a [VALUE] {
+    let length = unsafe { sys::RARRAY_LEN(array) } as usize;
+    unsafe { from_raw_parts(sys::RARRAY_CONST_PTR(array), length) }
+}
+
 impl ToRust<VecWrap<String>> for CheckedValue<VecWrap<String>>
     where VALUE: UncheckedValue<String>,
           CheckedValue<String>: ToRust<String>
 {
     fn to_rust(self) -> VecWrap<String> {
-        let len = unsafe { sys::RARRAY_LEN(self.inner) };
-        let ptr = unsafe { sys::RARRAY_PTR(self.inner) };
-        let mut vec: Vec<String> = Vec::with_capacity(len as usize);
-        for i in 0..len {
-            let val = unsafe { *ptr.offset(i) };
+        let slice = ruby_array_to_slice(self.inner);
+        let mut vec: Vec<String> = Vec::with_capacity(slice.len());
+        for val in slice.iter() {
             let checked = val.to_checked().unwrap();
             vec.push(checked.to_rust());
         }
-        return VecWrap(vec);
+        VecWrap(vec)
     }
 }
 
@@ -55,20 +57,15 @@ impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
           CheckedValue<VecWrap<String>>: ToRust<VecWrap<String>>
 {
     fn to_rust(self) -> VecWrap<VecWrap<String>> {
-        let len = unsafe { sys::RARRAY_LEN(self.inner) };
-        let ptr = unsafe { sys::RARRAY_PTR(self.inner) };
-        let mut vec: Vec<VecWrap<String>> = Vec::with_capacity(len as usize);
-        for i in 0..len {
-            let val = unsafe { *ptr.offset(i) };
+        let slice = ruby_array_to_slice(self.inner);
+        let mut vec: Vec<VecWrap<String>> = Vec::with_capacity(slice.len());
+        for val in slice.iter() {
             let checked = val.to_checked().unwrap();
             vec.push(checked.to_rust());
         }
-        return VecWrap(vec);
+        VecWrap(vec)
     }
 }
-
-
-
 
 #[cfg_attr(windows, link(name="helix-runtime"))]
 extern "C" {
@@ -104,7 +101,7 @@ fn generate_lines(rows: VecWrap<VecWrap<String>>) -> Result<String, Box<Error>> 
         wtr.write_record(&(row.0))?;
     }
 
-    return Ok(String::from_utf8(wtr.into_inner()?)?);
+    Ok(String::from_utf8(wtr.into_inner()?)?)
 }
 
 fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
@@ -116,7 +113,7 @@ fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
             rb_ary_push(inner_array, column_value);
         }
     }
-    return inner_array;
+    inner_array
 }
 
 
@@ -136,7 +133,6 @@ struct Enumerator {
     value: VALUE,
 }
 
-#[derive(Clone)]
 struct EnumeratorRead {
     value: VALUE,
     next: Option<Vec<u8>>,
@@ -177,9 +173,10 @@ impl EnumeratorRead {
                        sys::rb_intern("next\0".as_ptr() as *const i8),
                        0)
         };
-        let size = unsafe { sys::RSTRING_LEN(next) };
-        let ptr = unsafe { sys::RSTRING_PTR(next) };
-        let slice = unsafe { std::slice::from_raw_parts(ptr as *const u8, size as usize) };
+        let slice = unsafe {
+            from_raw_parts(sys::RSTRING_PTR(next) as *const u8,
+                           sys::RSTRING_LEN(next) as usize)
+        };
 
         self.read_and_store_overflow(buf, slice)
     }
@@ -187,19 +184,22 @@ impl EnumeratorRead {
 
 impl Read for EnumeratorRead {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self.clone().next {
+        match self.next.clone() {
             Some(inner) => self.read_and_store_overflow(buf, &inner),
             None => self.read_from_external(buf),
         }
     }
 }
 
+fn csv_reader<R: Read>(reader: R) -> csv::Reader<R> {
+    csv::ReaderBuilder::new()
+        .buffer_capacity(16 * 1024)
+        .has_headers(false)
+        .from_reader(reader)
+}
 
 fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .from_reader(EnumeratorRead::new(data.value));
-
+    let mut reader = csv_reader(EnumeratorRead::new(data.value));
     let mut record = csv::ByteRecord::new();
 
     while reader.read_byte_record(&mut record)? {
@@ -209,17 +209,14 @@ fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
         }
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .from_reader(data.as_bytes());
-    let records = reader
+    let mut reader = csv_reader(data.as_bytes());
+    reader
         .records()
-        .collect::<Result<Vec<csv::StringRecord>, csv::Error>>();
-    return records;
+        .collect::<Result<Vec<csv::StringRecord>, csv::Error>>()
 }
 
 ruby! {
@@ -233,8 +230,8 @@ ruby! {
         def parse(data: String) -> VecWrap<csv::StringRecord> {
             match parse_csv(data) {
                 Err(_) => throw!("Error parsing CSV"),
-                Ok(result) => return VecWrap(result)
-            };
+                Ok(result) => VecWrap(result)
+            }
         }
     }
     class RscsvWriter {
@@ -243,8 +240,8 @@ ruby! {
             let result = wtr.write_record(&(row.0));
             match result {
                 Err(_) => throw!("Error generating csv"),
-                Ok(_) => return String::from_utf8(wtr.into_inner().unwrap()).unwrap(),
-            };
+                Ok(_) => String::from_utf8(wtr.into_inner().unwrap()).unwrap(),
+            }
         }
 
         def generate_lines(rows: VecWrap<VecWrap<String>>) -> String {
