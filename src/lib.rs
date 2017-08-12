@@ -6,14 +6,15 @@ use std::error::Error;
 use std::io::Read;
 use std::slice::from_raw_parts;
 use helix::sys;
-use helix::sys::{VALUE, ID};
-use helix::{UncheckedValue, CheckResult, CheckedValue, ToRust, ToRuby};
+use helix::sys::{ID, VALUE};
+use helix::{CheckResult, CheckedValue, ToRuby, ToRust, UncheckedValue};
 use helix::libc::c_int;
 
 struct VecWrap<T>(Vec<T>);
 
 impl<T> UncheckedValue<VecWrap<T>> for VALUE
-    where VALUE: UncheckedValue<T>
+where
+    VALUE: UncheckedValue<T>,
 {
     fn to_checked(self) -> CheckResult<VecWrap<T>> {
         if unsafe { sys::RB_TYPE_P(self, sys::T_ARRAY) } {
@@ -26,8 +27,10 @@ impl<T> UncheckedValue<VecWrap<T>> for VALUE
             Ok(unsafe { CheckedValue::<VecWrap<T>>::new(self) })
         } else {
             let val = unsafe { CheckedValue::<String>::new(sys::rb_inspect(self)) };
-            Err(format!("No implicit conversion of {} into Vec<String>",
-                        val.to_rust()))
+            Err(format!(
+                "No implicit conversion of {} into Vec<String>",
+                val.to_rust()
+            ))
         }
     }
 }
@@ -38,8 +41,9 @@ fn ruby_array_to_slice<'a>(array: VALUE) -> &'a [VALUE] {
 }
 
 impl ToRust<VecWrap<String>> for CheckedValue<VecWrap<String>>
-    where VALUE: UncheckedValue<String>,
-          CheckedValue<String>: ToRust<String>
+where
+    VALUE: UncheckedValue<String>,
+    CheckedValue<String>: ToRust<String>,
 {
     fn to_rust(self) -> VecWrap<String> {
         let slice = ruby_array_to_slice(self.inner);
@@ -53,8 +57,9 @@ impl ToRust<VecWrap<String>> for CheckedValue<VecWrap<String>>
 }
 
 impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
-    where VALUE: UncheckedValue<VecWrap<String>>,
-          CheckedValue<VecWrap<String>>: ToRust<VecWrap<String>>
+where
+    VALUE: UncheckedValue<VecWrap<String>>,
+    CheckedValue<VecWrap<String>>: ToRust<VecWrap<String>>,
 {
     fn to_rust(self) -> VecWrap<VecWrap<String>> {
         let slice = ruby_array_to_slice(self.inner);
@@ -67,7 +72,7 @@ impl ToRust<VecWrap<VecWrap<String>>> for CheckedValue<VecWrap<VecWrap<String>>>
     }
 }
 
-#[cfg_attr(windows, link(name="helix-runtime"))]
+#[cfg_attr(windows, link(name = "helix-runtime"))]
 extern "C" {
     pub fn rb_ary_new_capa(capa: isize) -> VALUE;
     pub fn rb_ary_entry(ary: VALUE, offset: isize) -> VALUE;
@@ -108,8 +113,8 @@ fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
     let inner_array = unsafe { rb_ary_new_capa(record.len() as isize) };
     for column in record.iter() {
         unsafe {
-            let column_value = sys::rb_utf8_str_new(column.as_ptr() as *const i8,
-                                                    column.len() as i64);
+            let column_value =
+                sys::rb_utf8_str_new(column.as_ptr() as *const i8, column.len() as i64);
             rb_ary_push(inner_array, column_value);
         }
     }
@@ -169,13 +174,17 @@ impl EnumeratorRead {
 
     fn read_from_external(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let next = unsafe {
-            rb_funcall(self.value,
-                       sys::rb_intern("next\0".as_ptr() as *const i8),
-                       0)
+            rb_funcall(
+                self.value,
+                sys::rb_intern("next\0".as_ptr() as *const i8),
+                0,
+            )
         };
         let slice = unsafe {
-            from_raw_parts(sys::RSTRING_PTR(next) as *const u8,
-                           sys::RSTRING_LEN(next) as usize)
+            from_raw_parts(
+                sys::RSTRING_PTR(next) as *const u8,
+                sys::RSTRING_LEN(next) as usize,
+            )
         };
 
         self.read_and_store_overflow(buf, slice)
