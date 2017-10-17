@@ -6,7 +6,7 @@ use std::error::Error;
 use std::io::Read;
 use helix::sys;
 use helix::sys::{ID, VALUE};
-use helix::{FromRuby, CheckResult, ToRuby, ToRubyResult};
+use helix::{FromRuby, CheckResult};
 use helix::libc::c_int;
 
 #[cfg_attr(windows, link(name = "helix-runtime"))]
@@ -14,26 +14,6 @@ extern "C" {
     pub fn rb_block_given_p() -> c_int;
     pub fn rb_yield(value: VALUE);
     pub fn rb_funcall(value: VALUE, name: ID, nargs: c_int, ...) -> VALUE;
-}
-
-struct Records(Vec<csv::StringRecord>);
-
-impl ToRuby for Records {
-    fn to_ruby(self) -> ToRubyResult {
-        let ary = unsafe { sys::rb_ary_new_capa(self.0.len() as isize) };
-        for row in self.0 {
-            let inner_array = unsafe { sys::rb_ary_new_capa(row.len() as isize) };
-            for column in row.iter() {
-                unsafe {
-                    sys::rb_ary_push(inner_array, column.to_ruby()?);
-                }
-            }
-            unsafe {
-                sys::rb_ary_push(ary, inner_array);
-            }
-        }
-        Ok(ary)
-    }
 }
 
 fn generate_lines(rows: Vec<Vec<String>>) -> Result<String, Box<Error>> {
@@ -153,8 +133,15 @@ fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
     Ok(())
 }
 
-fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
-    csv_reader(data.as_bytes()).records().collect()
+fn parse_csv(data: String) -> Result<Vec<Vec<String>>, csv::Error> {
+    csv_reader(data.as_bytes())
+        .records()
+        .map(|r| r.map(record_to_vec))
+        .collect()
+}
+
+fn record_to_vec(record: csv::StringRecord) -> Vec<String> {
+    record.iter().map(|s| s.to_string()).collect()
 }
 
 ruby! {
@@ -163,10 +150,8 @@ ruby! {
             yield_csv(data).map_err(|_| "Error parsing CSV")
         }
 
-        def parse(data: String) -> Result<Records, &'static str> {
-            parse_csv(data)
-                .map(|r| Records(r))
-                .map_err(|_| "Error parsing CSV")
+        def parse(data: String) -> Result<Vec<Vec<String>>, &'static str> {
+            parse_csv(data).map_err(|_| "Error parsing CSV")
         }
     }
 
