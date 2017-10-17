@@ -159,36 +159,28 @@ fn parse_csv(data: String) -> Result<Vec<csv::StringRecord>, csv::Error> {
 
 ruby! {
     class RscsvReader {
-        def each_internal(data: Enumerator) -> () {
-            match yield_csv(data) {
-                Err(_) => raise_panic!("Error parsing CSV"),
-                Ok(_) => ()
-            }
+        def each_internal(data: Enumerator) -> Result<(), &'static str> {
+            yield_csv(data).map_err(|_| "Error parsing CSV")
         }
 
-        def parse(data: String) -> Records {
-            match parse_csv(data) {
-                Err(_) => raise_panic!("Error parsing CSV"),
-                Ok(result) => Records(result)
-            }
+        def parse(data: String) -> Result<Records, &'static str> {
+            parse_csv(data)
+                .map(|r| Records(r))
+                .map_err(|_| "Error parsing CSV")
         }
     }
 
     class RscsvWriter {
-        def generate_line(row: Vec<String>) -> String {
+        def generate_line(row: Vec<String>) -> Result<String, &'static str> {
             let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
-            let result = wtr.write_record(&row);
-            match result {
-                Err(_) => raise_panic!("Error generating csv"),
-                Ok(_) => String::from_utf8(wtr.into_inner().unwrap()).unwrap(),
-            }
+
+            wtr.write_record(&row)
+                .map(|_| String::from_utf8(wtr.into_inner().unwrap()).unwrap())
+                .map_err(|_| "Error generating csv")
         }
 
-        def generate_lines(rows: Vec<Vec<String>>) -> String {
-            match generate_lines(rows) {
-                Err(_) => raise_panic!("Error generating csv"),
-                Ok(csv) => csv
-            }
+        def generate_lines(rows: Vec<Vec<String>>) -> Result<String, &'static str> {
+            generate_lines(rows).map_err(|_| "Error generating csv")
         }
     }
 }
