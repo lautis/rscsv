@@ -6,7 +6,7 @@ use std::error::Error;
 use std::io::Read;
 use helix::sys;
 use helix::sys::{ID, VALUE};
-use helix::{FromRuby, CheckResult};
+use helix::{FromRuby, CheckResult, ToRuby};
 use helix::libc::c_int;
 
 #[cfg_attr(windows, link(name = "helix-runtime"))]
@@ -133,15 +133,15 @@ fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
     Ok(())
 }
 
-fn parse_csv(data: String) -> Result<Vec<Vec<String>>, csv::Error> {
+fn parse_csv(data: String) -> Result<Vec<Vec<VALUE>>, csv::Error> {
     csv_reader(data.as_bytes())
         .records()
         .map(|r| r.map(record_to_vec))
         .collect()
 }
 
-fn record_to_vec(record: csv::StringRecord) -> Vec<String> {
-    record.iter().map(|s| s.to_string()).collect()
+fn record_to_vec(record: csv::StringRecord) -> Vec<VALUE> {
+    record.iter().map(|s| s.to_ruby().unwrap()).collect()
 }
 
 ruby! {
@@ -150,7 +150,7 @@ ruby! {
             yield_csv(data).map_err(|_| "Error parsing CSV")
         }
 
-        def parse(data: String) -> Result<Vec<Vec<String>>, &'static str> {
+        def parse(data: String) -> Result<Vec<Vec<VALUE>>, &'static str> {
             parse_csv(data).map_err(|_| "Error parsing CSV")
         }
     }
