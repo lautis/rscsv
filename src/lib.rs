@@ -16,10 +16,10 @@ extern "C" {
     pub fn rb_funcall(value: VALUE, name: ID, nargs: c_int, ...) -> VALUE;
 }
 
-fn generate_lines(rows: Vec<Vec<String>>) -> Result<String, Box<Error>> {
+fn generate_lines(rows: &[Vec<String>]) -> Result<String, Box<Error>> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
     for row in rows {
-        wtr.write_record(&row)?;
+        wtr.write_record(row)?;
     }
 
     Ok(String::from_utf8(wtr.into_inner()?)?)
@@ -106,7 +106,7 @@ impl EnumeratorRead {
 impl Read for EnumeratorRead {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self.next.clone() {
-            Some(inner) => self.read_and_store_overflow(buf, &inner),
+            Some(ref inner) => self.read_and_store_overflow(buf, inner),
             None => self.read_from_external(buf),
         }
     }
@@ -119,7 +119,7 @@ fn csv_reader<R: Read>(reader: R) -> csv::Reader<R> {
         .from_reader(reader)
 }
 
-fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
+fn yield_csv(data: &Enumerator) -> Result<(), csv::Error> {
     let mut reader = csv_reader(EnumeratorRead::new(data.value));
     let mut record = csv::ByteRecord::new();
 
@@ -133,25 +133,25 @@ fn yield_csv(data: Enumerator) -> Result<(), csv::Error> {
     Ok(())
 }
 
-fn parse_csv(data: String) -> Result<Vec<Vec<VALUE>>, csv::Error> {
+fn parse_csv(data: &str) -> Result<Vec<Vec<VALUE>>, csv::Error> {
     csv_reader(data.as_bytes())
         .records()
-        .map(|r| r.map(record_to_vec))
+        .map(|r| r.map(|v| record_to_vec(&v)))
         .collect()
 }
 
-fn record_to_vec(record: csv::StringRecord) -> Vec<VALUE> {
+fn record_to_vec(record: &csv::StringRecord) -> Vec<VALUE> {
     record.iter().map(|s| s.to_ruby().unwrap()).collect()
 }
 
 ruby! {
     class RscsvReader {
         def each_internal(data: Enumerator) -> Result<(), &'static str> {
-            yield_csv(data).map_err(|_| "Error parsing CSV")
+            yield_csv(&data).map_err(|_| "Error parsing CSV")
         }
 
         def parse(data: String) -> Result<Vec<Vec<VALUE>>, &'static str> {
-            parse_csv(data).map_err(|_| "Error parsing CSV")
+            parse_csv(&data).map_err(|_| "Error parsing CSV")
         }
     }
 
@@ -165,7 +165,7 @@ ruby! {
         }
 
         def generate_lines(rows: Vec<Vec<String>>) -> Result<String, &'static str> {
-            generate_lines(rows).map_err(|_| "Error generating csv")
+            generate_lines(&rows).map_err(|_| "Error generating csv")
         }
     }
 }
