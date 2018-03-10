@@ -105,7 +105,7 @@ impl EnumeratorRead {
 
 impl Read for EnumeratorRead {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self.next.clone() {
+        match self.next.take() {
             Some(ref inner) => self.read_and_store_overflow(buf, inner),
             None => self.read_from_external(buf),
         }
