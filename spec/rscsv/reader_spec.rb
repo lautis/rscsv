@@ -32,5 +32,15 @@ RSpec.describe Rscsv::Reader do
       expect(Rscsv::Reader.to_enum(:each, [csv].each).to_a)
         .to eq(CSV.parse(csv))
     end
+
+    it 're-throws exceptions results' do
+      10.times do
+        expect do
+          Rscsv::Reader.each(data.each_char) do |part|
+            raise "error"
+          end
+        end.to raise_error("error")
+      end
+    end
   end
 end

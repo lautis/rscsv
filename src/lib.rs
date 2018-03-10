@@ -154,8 +154,14 @@ fn yield_csv(data: &Enumerator) -> Result<(), csv::Error> {
 
     while reader.read_byte_record(&mut record)? {
         let inner_array = record_to_ruby(&record);
-        unsafe {
-            sys::rb_yield(inner_array);
+        let result = protect(|| {
+            unsafe {
+                return sys::rb_yield(inner_array);
+            }
+        });
+
+        if result.is_err() {
+            unsafe { sys::rb_jump_tag(result.unwrap_err()) };
         }
     }
 
