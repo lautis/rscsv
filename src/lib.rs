@@ -5,16 +5,8 @@ extern crate csv;
 use std::error::Error;
 use std::io::Read;
 use helix::sys;
-use helix::sys::{ID, VALUE};
+use helix::sys::{VALUE};
 use helix::{FromRuby, CheckResult, ToRuby};
-use helix::libc::c_int;
-
-#[cfg_attr(windows, link(name = "helix-runtime"))]
-extern "C" {
-    pub fn rb_block_given_p() -> c_int;
-    pub fn rb_yield(value: VALUE);
-    pub fn rb_funcall(value: VALUE, name: ID, nargs: c_int, ...) -> VALUE;
-}
 
 fn generate_lines(rows: &[Vec<String>]) -> Result<String, Box<Error>> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
@@ -90,7 +82,7 @@ impl EnumeratorRead {
 
     fn read_from_external(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let next = unsafe {
-            rb_funcall(
+            sys::rb_funcall(
                 self.value,
                 sys::rb_intern("next\0".as_ptr() as *const i8),
                 0,
@@ -126,7 +118,7 @@ fn yield_csv(data: &Enumerator) -> Result<(), csv::Error> {
     while reader.read_byte_record(&mut record)? {
         let inner_array = record_to_ruby(&record);
         unsafe {
-            rb_yield(inner_array);
+            sys::rb_yield(inner_array);
         }
     }
 
