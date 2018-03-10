@@ -5,8 +5,9 @@ extern crate csv;
 use std::error::Error;
 use std::io::Read;
 use helix::sys;
-use helix::sys::{VALUE};
+use helix::sys::{VALUE, RubyException};
 use helix::{FromRuby, CheckResult, ToRuby};
+use helix::libc::{c_void};
 
 fn generate_lines(rows: &[Vec<String>]) -> Result<String, Box<Error>> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
@@ -27,6 +28,33 @@ fn record_to_ruby(record: &csv::ByteRecord) -> VALUE {
         }
     }
     inner_array
+}
+
+extern fn protect_wrapper<F>(closure: *mut c_void) -> VALUE
+      where F: FnOnce() -> VALUE {
+    let closure_option = closure as *mut Option<F>;
+    unsafe {
+      (*closure_option).take().unwrap()()
+    }
+  }
+
+pub fn protect<F>(func: F) -> Result<VALUE, RubyException>
+where
+    F: FnOnce() -> VALUE,
+{
+    let mut state = sys::EMPTY_EXCEPTION;
+    let value = unsafe {
+        sys::rb_protect(
+            protect_wrapper::<F>,
+            &func as *const _ as *mut c_void,
+            &mut state,
+        )
+    };
+    if state == sys::EMPTY_EXCEPTION {
+        Ok(value)
+    } else {
+        Err(state)
+    }
 }
 
 struct Enumerator {
@@ -81,17 +109,26 @@ impl EnumeratorRead {
     }
 
     fn read_from_external(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let next = unsafe {
-            sys::rb_funcall(
-                self.value,
+
+        let value = self.value;
+        let result = protect(|| {
+            unsafe { sys::rb_funcall(
+                value,
                 sys::rb_intern("next\0".as_ptr() as *const i8),
-                0,
-            )
-        };
+                0)
+            }
+        });
+        match result {
+            Ok(next) => {
+                let string = String::from_ruby_unwrap(next);
+                self.read_and_store_overflow(buf, string.as_bytes())
+            },
+            Err(state) => {
+                unsafe { sys::rb_jump_tag(state) };
+                //Err(std::io::Error::new(ErrorKind::Other, "Ruby Exception"))
+            }
+        }
 
-        let string = String::from_ruby_unwrap(next);
-
-        self.read_and_store_overflow(buf, string.as_bytes())
     }
 }
 
