@@ -18,7 +18,13 @@ after_success:
 matrix:
   include:
     - os: linux
+      rvm: 2.5.0
+      env: NATIVE_BUNDLE=true
     - os: osx
       osx_image: xcode8.3
+      rvm: 2.5.0
+      env: NATIVE_BUNDLE=true
     - os: osx
       osx_image: xcode9.2
+      rvm: 2.5.0
+      env: NATIVE_BUNDLE=true
