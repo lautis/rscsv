@@ -10,3 +10,15 @@ before_install:
   - export PATH="$HOME/.cargo/bin:$PATH"
   - rustup default stable
   - rustc --version
+install:
+  - bundle install --path vendor/bundle
+  - bundle exec rake helix:copy_dll build
+after_success:
+  - ruby ./bin/ci-publish $TRAVIS_TAG
+matrix:
+  include:
+    - os: linux
+    - os: osx
+      osx_image: xcode8.3
+    - os: osx
+      osx_image: xcode9.2
