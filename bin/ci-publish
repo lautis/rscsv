@@ -6,7 +6,7 @@ puts `gem build rscsv.gemspec`
 git_tag = ARGV[0]
 puts git_tag if git_tag
 
-if git_tag && git_tag.match(/^v[0-9.]+/)
+if git_tag && git_tag.match(/^v[0-9.]+/) && ENV['GEM_PUBLISH']
   require 'yaml'
   gem_config_dir = "#{Dir.home}/.gem"
   credentials_file = "#{gem_config_dir}/credentials"

@@ -3,7 +3,6 @@ language: ruby
 rvm:
   - 2.5.0
   - 2.4.3
-  - 2.3.6
 before_install:
   - gem install bundler -v 1.16.1
   - if [ ! -e "$HOME/.cargo/bin" ]; then curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y; fi
@@ -19,12 +18,22 @@ matrix:
   include:
     - os: linux
       rvm: 2.3.6
-      env: NATIVE_BUNDLE=true
+      env:
+        - GEM_PUBLISH=true
+    - os: linux
+      rvm: 2.3.6
+      env:
+        - NATIVE_BUNDLE=true
+        - GEM_PUBLISH=true
     - os: osx
       osx_image: xcode8.3
       rvm: 2.3.6
-      env: NATIVE_BUNDLE=true
+      env:
+        - NATIVE_BUNDLE=true
+        - GEM_PUBLISH=true
     - os: osx
       osx_image: xcode9.2
       rvm: 2.3.6
-      env: NATIVE_BUNDLE=true
+      env:
+        - NATIVE_BUNDLE=true
+        - GEM_PUBLISH=true
