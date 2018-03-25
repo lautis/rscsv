@@ -4,7 +4,7 @@ require 'rscsv/version'
 
 ruby_sources = Dir['{lib/**/*,[A-Z]*}'] - Dir['Cargo.*', 'Gemfile.lock']
 rust_sources = Dir['{src/**/*,ext/**/*,Cargo.*}']
-native_bundle = Dir['lib/rscsv/native.bundle']
+native_bundle = Dir['lib/rscsv/native.bundle', 'lib/rscsv/native.so']
 
 Gem::Specification.new do |spec|
   spec.name = 'rscsv'
