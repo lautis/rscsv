@@ -3,14 +3,36 @@ extern crate helix;
 extern crate csv;
 
 use std::error::Error;
+use std::collections::HashMap;
 use std::io::Read;
 use helix::sys;
 use helix::sys::{VALUE, RubyException};
-use helix::{FromRuby, CheckResult, ToRuby};
+use helix::{CheckResult, FromRuby, Symbol, ToRuby};
 use helix::libc::{c_void};
 
-fn generate_lines(rows: &[Vec<String>]) -> Result<String, Box<Error>> {
-    let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+fn delimiter(options: &HashMap<Symbol, String>) -> u8 {
+    let default = ',' as u8;
+    match options.get(&Symbol::from_string("col_sep".to_string())) {
+        Some(column_separator) => {
+            if column_separator.len() > 0 {
+                column_separator.as_bytes()[0]
+            } else {
+                default
+            }
+        },
+        None => default
+    }
+}
+
+fn csv_writer_builder(delimiter: u8) -> csv::WriterBuilder {
+    let mut builder = csv::WriterBuilder::new();
+    builder.delimiter(delimiter);
+    return builder;
+}
+
+fn generate_lines(rows: &[Vec<String>], builder: csv::WriterBuilder) -> Result<String, Box<Error>> {
+    let data: Vec<u8> = vec![];
+    let mut wtr = builder.from_writer(data);
     for row in rows {
         wtr.write_record(row)?;
     }
@@ -191,16 +213,29 @@ ruby! {
     }
 
     class RscsvWriter {
-        def generate_line(row: Vec<String>) -> Result<String, &'static str> {
-            let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+        struct {
+            delimiter: u8
+        }
 
-            wtr.write_record(&row)
-                .map(|_| String::from_utf8(wtr.into_inner().unwrap()).unwrap())
+        def initialize(helix, options: HashMap<Symbol, String>) {
+            RscsvWriter { helix, delimiter: delimiter(&options) }
+        }
+
+        def write(self, rows: Vec<Vec<String>>) -> Result<String, &'static str> {
+            let builder = csv_writer_builder(self.delimiter);
+            generate_lines(&rows, builder).map_err(|_| "Error generating csv")
+        }
+
+        def generate_line(row: Vec<String>) -> Result<String, &'static str> {
+            let mut writer = csv_writer_builder(',' as u8).from_writer(vec![]);
+            writer.write_record(&row)
+                .map(|_| String::from_utf8(writer.into_inner().unwrap()).unwrap())
                 .map_err(|_| "Error generating csv")
         }
 
         def generate_lines(rows: Vec<Vec<String>>) -> Result<String, &'static str> {
-            generate_lines(&rows).map_err(|_| "Error generating csv")
+            let builder = csv_writer_builder(',' as u8);
+            generate_lines(&rows, builder).map_err(|_| "Error generating csv")
         }
     }
 }
