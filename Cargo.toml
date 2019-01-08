@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 helix = "0.7.3"
-csv = "1.0.0-beta.4"
+csv = "^1"
