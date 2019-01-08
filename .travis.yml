@@ -32,7 +32,7 @@ matrix:
         - NATIVE_BUNDLE=true
         - GEM_PUBLISH=true
     - os: osx
-      osx_image: xcode9.3beta
+      osx_image: xcode10.1
       rvm: 2.3.8
       env:
         - NATIVE_BUNDLE=true
