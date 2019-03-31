@@ -37,3 +37,9 @@ matrix:
       env:
         - NATIVE_BUNDLE=true
         - GEM_PUBLISH=true
+    - os: osx
+      osx_image: xcode10.2
+      rvm: 2.3.8
+      env:
+        - NATIVE_BUNDLE=true
+        - GEM_PUBLISH=true
