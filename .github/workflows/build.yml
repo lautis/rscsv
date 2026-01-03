@@ -8,6 +8,11 @@ on:
         type: boolean
         default: true
         required: false
+      ruby-versions:
+        description: "Ruby versions to test and build for (JSON array)"
+        type: string
+        default: '["3.0", "3.1", "3.2", "3.3", "3.4"]'
+        required: false
 
 jobs:
   # Test on multiple Ruby versions and platforms
@@ -17,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        ruby: ["3.0", "3.1", "3.2", "3.3"]
+        ruby: ${{ fromJSON(inputs.ruby-versions) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +70,7 @@ jobs:
         uses: oxidize-rb/actions/cross-gem@v1
         with:
           platform: ${{ matrix.platform }}
-          ruby-versions: "3.0, 3.1, 3.2, 3.3"
+          ruby-versions: ${{ join(fromJSON(inputs.ruby-versions), ', ') }}
 
       - name: Upload gem artifact
         if: inputs.upload-artifacts
