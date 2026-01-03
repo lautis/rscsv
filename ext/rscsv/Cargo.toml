@@ -1,6 +1,6 @@
 [package]
 name = "rscsv"
-version = "0.5.0"
+version = "0.7.0"
 authors = ["Ville Lautanala <lautis@gmail.com>"]
 edition = "2021"
 
@@ -10,4 +10,3 @@ crate-type = ["cdylib"]
 [dependencies]
 magnus = { version = "0.7", features = ["rb-sys"] }
 csv = "1"
-
