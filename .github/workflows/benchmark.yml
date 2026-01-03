@@ -33,19 +33,31 @@ jobs:
           
           input = File.read('benchmark_output.txt')
           
-          # Split into writing and reading sections
-          sections = input.split(/^===/)
-          
-          def parse_section(section, title)
-            lines = section.lines
+          def parse_section(text, title)
+            lines = text.lines.map(&:chomp)
             results = []
+            comparisons = []
+            in_comparison = false
+            in_calculating = false
             
             lines.each do |line|
-              # Match lines like: "rscsv    123.456k (± 5.0%) i/s -    100.000k in   0.500000s"
-              if line =~ /^(\w[\w\s]+?)\s+(\d+\.?\d*[kM]?)\s+\([^)]+\)\s+i\/s/
+              # Start of calculation section
+              if line =~ /^Calculating/
+                in_calculating = true
+                next
+              end
+              
+              # Match result lines after "Calculating" section
+              # Format: "            Ruby CSV    463.779 (± 2.4%) i/s    (2.16 ms/i) - ..."
+              if in_calculating && line =~ /^\s*(.+?)\s\s+(\d+\.?\d*)\s+\(.+?\)\s+i\/s/
                 name = $1.strip
                 ips = $2
                 results << { name: name, ips: ips }
+              elsif line =~ /^Comparison:/
+                in_comparison = true
+                in_calculating = false
+              elsif in_comparison && line.strip =~ /^(.+?):\s+(.+)/
+                comparisons << "- **#{$1.strip}**: #{$2.strip}"
               end
             end
             
@@ -53,51 +65,48 @@ jobs:
             
             # Build markdown table
             table = "### #{title}\n\n"
-            table += "| Library | Iterations/second |\n"
-            table += "|---------|------------------|\n"
+            table += "| Library | Iterations/sec |\n"
+            table += "|---------|---------------|\n"
             
             results.each do |result|
               table += "| #{result[:name]} | #{result[:ips]} |\n"
             end
             
             # Add comparison info
-            comparison_start = lines.index { |l| l =~ /Comparison:/ }
-            if comparison_start
+            if !comparisons.empty?
               table += "\n**Comparison:**\n\n"
-              lines[(comparison_start + 1)..-1].each do |line|
-                line = line.strip
-                next if line.empty?
-                # Format comparison lines
-                if line =~ /(.+?):\s+(.+)/
-                  table += "- #{$1.strip}: #{$2.strip}\n"
-                end
-              end
+              table += comparisons.join("\n") + "\n"
             end
             
             table
           end
           
-          output = "## Benchmark Results\n\n"
-          output += "*Benchmarks run with YJIT enabled on Ruby #{RUBY_VERSION}*\n\n"
+          output = "## 🚀 Benchmark Results\n\n"
+          output += "_Benchmarks run with YJIT enabled on Ruby #{RUBY_VERSION}_\n\n"
+          
+          # Split by === markers to get sections
+          sections = input.split(/^=== /)
           
           sections.each do |section|
-            if section =~ /CSV Writing/
-              result = parse_section(section, "CSV Writing Performance")
-              output += result + "\n\n" if result
-            elsif section =~ /CSV Reading/
-              result = parse_section(section, "CSV Reading Performance")
-              output += result + "\n\n" if result
+            if section.include?("CSV Writing Benchmark")
+              result = parse_section(section, "📝 CSV Writing Performance")
+              output += result + "\n" if result
+            elsif section.include?("CSV Reading Benchmark")
+              result = parse_section(section, "📖 CSV Reading Performance")
+              output += result + "\n" if result
             end
           end
           
           # Write to GitHub Step Summary
           if ENV['GITHUB_STEP_SUMMARY']
             File.write(ENV['GITHUB_STEP_SUMMARY'], output)
-            puts "Results written to GitHub Actions summary"
+            puts "✅ Results written to GitHub Actions summary"
+          else
+            puts "⚠️  GITHUB_STEP_SUMMARY not available, printing to stdout:"
           end
           
           # Also print to stdout
-          puts output
+          puts "\n" + output
           EOF
           
           ruby parse_benchmark.rb
