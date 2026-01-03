@@ -28,6 +28,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
+          bundler-cache: true
 
       - name: Download all gem artifacts
         uses: actions/download-artifact@v4
@@ -36,11 +37,35 @@ jobs:
           pattern: "*-gem*"
           merge-multiple: true
 
+      - name: Install jq (if needed)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: List gems to publish
         run: ls -la pkg/
 
       - name: Publish gems to RubyGems (with trusted publishing)
+        env:
+          GEM_HOST_API_KEY: "rubygems"
         run: |
+          # Get OIDC token from GitHub
+          OIDC_TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=rubygems.org" | jq -r '.value')
+          
+          # Exchange OIDC token for RubyGems API token
+          API_TOKEN=$(curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d "{\"jwt\": \"$OIDC_TOKEN\"}" \
+            https://rubygems.org/api/v1/oidc/trusted_publisher/exchange_token | jq -r '.rubygems_api_key')
+          
+          # Configure gem to use the API token
+          mkdir -p ~/.gem
+          cat > ~/.gem/credentials << EOF
+          ---
+          :rubygems_api_key: ${API_TOKEN}
+          EOF
+          chmod 0600 ~/.gem/credentials
+          
+          # Push each gem
           for gem in pkg/*.gem; do
             echo "Publishing $gem"
             gem push "$gem"
