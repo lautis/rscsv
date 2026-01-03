@@ -1,6 +1,5 @@
-require 'helix_runtime'
-require 'rscsv/native'
-require 'rscsv/version'
+require_relative 'rscsv/rscsv'
+require_relative 'rscsv/version'
 
 module Rscsv
   Reader = RscsvReader
@@ -12,5 +11,6 @@ module Rscsv
       nil
     end
   end
+
   Writer = RscsvWriter
 end
