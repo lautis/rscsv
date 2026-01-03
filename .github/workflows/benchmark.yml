@@ -1,0 +1,111 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby and Rust
+        uses: oxidize-rb/actions/setup-ruby-and-rust@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+          cargo-cache: true
+
+      - name: Build extension
+        run: bundle exec rake compile
+
+      - name: Run benchmarks with YJIT
+        run: |
+          bundle exec ruby --yjit bin/benchmark | tee benchmark_output.txt
+
+      - name: Parse and format results
+        run: |
+          cat > parse_benchmark.rb << 'EOF'
+          #!/usr/bin/env ruby
+          
+          input = File.read('benchmark_output.txt')
+          
+          # Split into writing and reading sections
+          sections = input.split(/^===/)
+          
+          def parse_section(section, title)
+            lines = section.lines
+            results = []
+            
+            lines.each do |line|
+              # Match lines like: "rscsv    123.456k (± 5.0%) i/s -    100.000k in   0.500000s"
+              if line =~ /^(\w[\w\s]+?)\s+(\d+\.?\d*[kM]?)\s+\([^)]+\)\s+i\/s/
+                name = $1.strip
+                ips = $2
+                results << { name: name, ips: ips }
+              end
+            end
+            
+            return nil if results.empty?
+            
+            # Build markdown table
+            table = "### #{title}\n\n"
+            table += "| Library | Iterations/second |\n"
+            table += "|---------|------------------|\n"
+            
+            results.each do |result|
+              table += "| #{result[:name]} | #{result[:ips]} |\n"
+            end
+            
+            # Add comparison info
+            comparison_start = lines.index { |l| l =~ /Comparison:/ }
+            if comparison_start
+              table += "\n**Comparison:**\n\n"
+              lines[(comparison_start + 1)..-1].each do |line|
+                line = line.strip
+                next if line.empty?
+                # Format comparison lines
+                if line =~ /(.+?):\s+(.+)/
+                  table += "- #{$1.strip}: #{$2.strip}\n"
+                end
+              end
+            end
+            
+            table
+          end
+          
+          output = "## Benchmark Results\n\n"
+          output += "*Benchmarks run with YJIT enabled on Ruby #{RUBY_VERSION}*\n\n"
+          
+          sections.each do |section|
+            if section =~ /CSV Writing/
+              result = parse_section(section, "CSV Writing Performance")
+              output += result + "\n\n" if result
+            elsif section =~ /CSV Reading/
+              result = parse_section(section, "CSV Reading Performance")
+              output += result + "\n\n" if result
+            end
+          end
+          
+          # Write to GitHub Step Summary
+          if ENV['GITHUB_STEP_SUMMARY']
+            File.write(ENV['GITHUB_STEP_SUMMARY'], output)
+            puts "Results written to GitHub Actions summary"
+          end
+          
+          # Also print to stdout
+          puts output
+          EOF
+          
+          ruby parse_benchmark.rb
+
+      - name: Upload benchmark output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark_output.txt
+          retention-days: 30
