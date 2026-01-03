@@ -14,6 +14,11 @@ require 'rscsv'
 require 'csv'
 require 'osv'
 require 'stringio'
+require 'json'
+
+# Parse command line arguments
+json_output = ARGV.include?('--json')
+results = { ruby_version: RUBY_VERSION, yjit_enabled: defined?(RubyVM::YJIT), benchmarks: {} }
 
 rows = (0...1000).map do
   (0...10).map { SecureRandom.hex }
@@ -23,8 +28,8 @@ csv_string = CSV.generate do |csv|
   rows.each { |row| csv << row }
 end
 
-puts "\n=== CSV Writing Benchmark ==="
-Benchmark.ips do |x|
+puts "\n=== CSV Writing Benchmark ===" unless json_output
+write_report = Benchmark.ips(quiet: json_output) do |x|
   x.report('Ruby CSV') do |times|
     times.times do
       CSV.generate do |csv|
@@ -37,11 +42,22 @@ Benchmark.ips do |x|
     times.times { Rscsv::Writer.generate_lines(rows) }
   end
 
-  x.compare!
+  x.compare! unless json_output
 end
 
-puts "\n=== CSV Reading Benchmark ==="
-Benchmark.ips do |x|
+if json_output
+  write_results = {}
+  write_report.entries.each do |entry|
+    write_results[entry.label] = {
+      ips: entry.stats.central_tendency,
+      stddev_percentage: entry.stats.error_percentage
+    }
+  end
+  results[:benchmarks][:writing] = write_results
+end
+
+puts "\n=== CSV Reading Benchmark ===" unless json_output
+read_report = Benchmark.ips(quiet: json_output) do |x|
   x.report('Ruby CSV') do |times|
     times.times do
       CSV.parse(csv_string)
@@ -58,5 +74,21 @@ Benchmark.ips do |x|
     end
   end
 
-  x.compare!
+  x.compare! unless json_output
+end
+
+if json_output
+  read_results = {}
+  read_report.entries.each do |entry|
+    read_results[entry.label] = {
+      ips: entry.stats.central_tendency,
+      stddev_percentage: entry.stats.error_percentage
+    }
+  end
+  results[:benchmarks][:reading] = read_results
+end
+
+# Output JSON if requested
+if json_output
+  puts JSON.pretty_generate(results)
 end
