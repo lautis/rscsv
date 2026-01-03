@@ -1,11 +1,24 @@
 #!/usr/bin/env ruby
 
+# Enable YJIT if available (Ruby 3.1+)
+if defined?(RubyVM::YJIT) && RubyVM::YJIT.respond_to?(:enable)
+  RubyVM::YJIT.enable
+  puts "YJIT enabled" if ENV['DEBUG']
+end
+
 $LOAD_PATH << File.dirname(__FILE__) + '/../lib'
 
 require 'benchmark/ips'
 require 'securerandom'
 require 'rscsv'
 require 'csv'
+require 'osv'
+require 'stringio'
+require 'json'
+
+# Parse command line arguments
+json_output = ARGV.include?('--json')
+results = { ruby_version: RUBY_VERSION, yjit_enabled: defined?(RubyVM::YJIT), benchmarks: {} }
 
 rows = (0...1000).map do
   (0...10).map { SecureRandom.hex }
@@ -15,7 +28,8 @@ csv_string = CSV.generate do |csv|
   rows.each { |row| csv << row }
 end
 
-Benchmark.ips do |x|
+puts "\n=== CSV Writing Benchmark ===" unless json_output
+write_report = Benchmark.ips(quiet: json_output) do |x|
   x.report('Ruby CSV') do |times|
     times.times do
       CSV.generate do |csv|
@@ -28,10 +42,22 @@ Benchmark.ips do |x|
     times.times { Rscsv::Writer.generate_lines(rows) }
   end
 
-  x.compare!
+  x.compare! unless json_output
 end
 
-Benchmark.ips do |x|
+if json_output
+  write_results = {}
+  write_report.entries.each do |entry|
+    write_results[entry.label] = {
+      ips: entry.stats.central_tendency,
+      stddev_percentage: entry.stats.error_percentage
+    }
+  end
+  results[:benchmarks][:writing] = write_results
+end
+
+puts "\n=== CSV Reading Benchmark ===" unless json_output
+read_report = Benchmark.ips(quiet: json_output) do |x|
   x.report('Ruby CSV') do |times|
     times.times do
       CSV.parse(csv_string)
@@ -42,5 +68,27 @@ Benchmark.ips do |x|
     times.times { Rscsv::Reader.parse(csv_string) }
   end
 
-  x.compare!
+  x.report('osv') do |times|
+    times.times do
+      OSV.for_each(StringIO.new(csv_string), result_type: :array) { |row| row }
+    end
+  end
+
+  x.compare! unless json_output
+end
+
+if json_output
+  read_results = {}
+  read_report.entries.each do |entry|
+    read_results[entry.label] = {
+      ips: entry.stats.central_tendency,
+      stddev_percentage: entry.stats.error_percentage
+    }
+  end
+  results[:benchmarks][:reading] = read_results
+end
+
+# Output JSON if requested
+if json_output
+  puts JSON.pretty_generate(results)
 end

@@ -2,11 +2,12 @@
 name = "rscsv"
 version = "0.5.0"
 authors = ["Ville Lautanala <lautis@gmail.com>"]
+edition = "2021"
 
 [lib]
-
 crate-type = ["cdylib"]
 
 [dependencies]
-helix = "0.7.3"
-csv = "^1"
+magnus = { version = "0.7", features = ["rb-sys"] }
+csv = "1"
+

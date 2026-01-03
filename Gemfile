@@ -1,4 +1,6 @@
 source 'https://rubygems.org'
 
-# Specify your gem's dependencies in rscsv.gemspec
 gemspec
+
+# Benchmarking dependencies
+gem 'osv', '~> 0.4', require: false if RUBY_VERSION >= '3.2'

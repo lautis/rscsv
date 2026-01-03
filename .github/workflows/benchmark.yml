@@ -1,0 +1,116 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby and Rust
+        uses: oxidize-rb/actions/setup-ruby-and-rust@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+          cargo-cache: true
+
+      - name: Build extension
+        run: bundle exec rake compile
+
+      - name: Run benchmarks with YJIT
+        run: |
+          bundle exec ruby --yjit bin/benchmark --json > benchmark_results.json
+
+      - name: Format results as markdown
+        run: |
+          cat > format_results.rb << 'EOF'
+          #!/usr/bin/env ruby
+          require 'json'
+          
+          data = JSON.parse(File.read('benchmark_results.json'))
+          
+          output = "## 🚀 Benchmark Results\n\n"
+          output += "_Benchmarks run with YJIT enabled on Ruby #{data['ruby_version']}_\n\n"
+          
+          # Writing benchmark
+          if data['benchmarks']['writing']
+            output += "### 📝 CSV Writing Performance\n\n"
+            output += "| Library | Iterations/sec | Std Dev |\n"
+            output += "|---------|----------------|----------|\n"
+            
+            writing = data['benchmarks']['writing']
+            sorted_writing = writing.sort_by { |_, v| -v['ips'] }
+            
+            sorted_writing.each do |name, stats|
+              output += "| #{name} | #{stats['ips'].round(1)} | ±#{stats['stddev_percentage'].round(1)}% |\n"
+            end
+            
+            # Add comparison
+            if sorted_writing.length > 1
+              fastest = sorted_writing.first
+              output += "\n**Comparison:**\n\n"
+              sorted_writing.each do |name, stats|
+                if name == fastest[0]
+                  output += "- **#{name}**: #{stats['ips'].round(1)} i/s (fastest)\n"
+                else
+                  slowdown = fastest[1]['ips'] / stats['ips']
+                  output += "- **#{name}**: #{stats['ips'].round(1)} i/s - #{slowdown.round(2)}x slower\n"
+                end
+              end
+            end
+            output += "\n"
+          end
+          
+          # Reading benchmark
+          if data['benchmarks']['reading']
+            output += "### 📖 CSV Reading Performance\n\n"
+            output += "| Library | Iterations/sec | Std Dev |\n"
+            output += "|---------|----------------|----------|\n"
+            
+            reading = data['benchmarks']['reading']
+            sorted_reading = reading.sort_by { |_, v| -v['ips'] }
+            
+            sorted_reading.each do |name, stats|
+              output += "| #{name} | #{stats['ips'].round(1)} | ±#{stats['stddev_percentage'].round(1)}% |\n"
+            end
+            
+            # Add comparison
+            if sorted_reading.length > 1
+              fastest = sorted_reading.first
+              output += "\n**Comparison:**\n\n"
+              sorted_reading.each do |name, stats|
+                if name == fastest[0]
+                  output += "- **#{name}**: #{stats['ips'].round(1)} i/s (fastest)\n"
+                else
+                  slowdown = fastest[1]['ips'] / stats['ips']
+                  output += "- **#{name}**: #{stats['ips'].round(1)} i/s - #{slowdown.round(2)}x slower\n"
+                end
+              end
+            end
+            output += "\n"
+          end
+          
+          # Write to GitHub Step Summary
+          if ENV['GITHUB_STEP_SUMMARY']
+            File.write(ENV['GITHUB_STEP_SUMMARY'], output)
+            puts "✅ Results written to GitHub Actions summary"
+          end
+          
+          # Also print to stdout
+          puts output
+          EOF
+          
+          ruby format_results.rb
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark_results.json
+          retention-days: 30

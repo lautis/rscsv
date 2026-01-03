@@ -1,2 +1,0 @@
-Dir.chdir '..'
-import 'lib/tasks/helix_runtime.rake'
