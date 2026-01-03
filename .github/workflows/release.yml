@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  # Build all gems using the reusable workflow
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      upload-artifacts: true
+
+  # Publish all gems to RubyGems
+  publish:
+    name: Publish gems to RubyGems
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Download all gem artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: pkg
+          pattern: "*-gem*"
+          merge-multiple: true
+
+      - name: List gems to publish
+        run: ls -la pkg/
+
+      - name: Publish gems to RubyGems (with trusted publishing)
+        run: |
+          for gem in pkg/*.gem; do
+            echo "Publishing $gem"
+            gem push "$gem"
+          done

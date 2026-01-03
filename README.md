@@ -3,8 +3,6 @@
 Fast CSV using Rust extensions. Can read arrays of arrays from strings and write
 strings from arrays of arrays.
 
-[![Build Status](https://travis-ci.org/lautis/rscsv.svg?branch=master)](https://travis-ci.org/lautis/rscsv)
-
 ## Installation
 
 This gem requires Rust (~> 1.17) and Cargo to be installed. With those
