@@ -266,6 +266,7 @@ name = "rscsv"
 version = "0.7.0"
 dependencies = [
  "csv",
+ "csv-core",
  "magnus",
 ]
 

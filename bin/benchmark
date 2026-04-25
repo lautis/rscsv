@@ -19,18 +19,61 @@ require 'json'
 
 # Parse command line arguments
 json_output = ARGV.include?('--json')
-results = { ruby_version: RUBY_VERSION, yjit_enabled: defined?(RubyVM::YJIT), benchmarks: {} }
 
-rows = (0...1000).map do
-  (0...10).map { SecureRandom.hex }
+# A single benchmark run is short; raise the time/warmup so noise stays
+# below ±1% on a quiet machine.
+BENCH_TIME   = Float(ENV.fetch('BENCH_TIME', 5))
+BENCH_WARMUP = Float(ENV.fetch('BENCH_WARMUP', 2))
+ROW_COUNT    = Integer(ENV.fetch('ROW_COUNT', 1000))
+COL_COUNT    = Integer(ENV.fetch('COL_COUNT', 10))
+
+# Build a representative dataset:
+#  - mostly hex strings (no quoting needed)
+#  - one column containing commas + quotes (forces quote+escape paths)
+#  - one column with empty values
+def build_rows(n_rows, n_cols)
+  Array.new(n_rows) do |i|
+    base = Array.new(n_cols - 2) { SecureRandom.hex(8) }
+    base << (i.even? ? %(quoted "value",with,commas) : "plain")
+    base << (i.even? ? "" : "filled-#{i}")
+    base
+  end
 end
+
+rows = build_rows(ROW_COUNT, COL_COUNT)
 
 csv_string = CSV.generate do |csv|
   rows.each { |row| csv << row }
 end
 
-puts "\n=== CSV Writing Benchmark ===" unless json_output
+results = {
+  ruby_version: RUBY_VERSION,
+  yjit_enabled: defined?(RubyVM::YJIT) && RubyVM::YJIT.enabled?,
+  rows: ROW_COUNT,
+  cols: COL_COUNT,
+  csv_bytes: csv_string.bytesize,
+  benchmarks: {}
+}
+
+unless json_output
+  puts "Dataset: #{ROW_COUNT} rows × #{COL_COUNT} cols (#{csv_string.bytesize} bytes)"
+  puts "Ruby: #{RUBY_VERSION}#{' +YJIT' if results[:yjit_enabled]}"
+end
+
+def collect_results(report)
+  report.entries.each_with_object({}) do |entry, h|
+    h[entry.label] = {
+      ips: entry.stats.central_tendency,
+      stddev_percentage: entry.stats.error_percentage
+    }
+  end
+end
+
+# === Writing: Array<Array<String>> -> CSV string ===
+puts "\n=== CSV Writing Benchmark (generate_lines) ===" unless json_output
 write_report = Benchmark.ips(quiet: json_output) do |x|
+  x.config(time: BENCH_TIME, warmup: BENCH_WARMUP)
+
   x.report('Ruby CSV') do |times|
     times.times do
       CSV.generate do |csv|
@@ -45,51 +88,81 @@ write_report = Benchmark.ips(quiet: json_output) do |x|
 
   x.compare! unless json_output
 end
+results[:benchmarks][:writing] = collect_results(write_report) if json_output
 
-if json_output
-  write_results = {}
-  write_report.entries.each do |entry|
-    write_results[entry.label] = {
-      ips: entry.stats.central_tendency,
-      stddev_percentage: entry.stats.error_percentage
-    }
-  end
-  results[:benchmarks][:writing] = write_results
-end
+# === Writing single rows: generate_line ===
+single_row = rows[0]
 
-puts "\n=== CSV Reading Benchmark ===" unless json_output
-read_report = Benchmark.ips(quiet: json_output) do |x|
+puts "\n=== Single-row Writing Benchmark (generate_line) ===" unless json_output
+single_write_report = Benchmark.ips(quiet: json_output) do |x|
+  x.config(time: BENCH_TIME, warmup: BENCH_WARMUP)
+
   x.report('Ruby CSV') do |times|
-    times.times do
-      CSV.parse(csv_string)
-    end
+    times.times { CSV.generate_line(single_row) }
+  end
+
+  x.report('rscsv') do |times|
+    times.times { Rscsv::Writer.generate_line(single_row) }
+  end
+
+  x.compare! unless json_output
+end
+results[:benchmarks][:writing_single] = collect_results(single_write_report) if json_output
+
+# === Reading: CSV string -> Array<Array<String>> ===
+puts "\n=== CSV Reading Benchmark (parse) ===" unless json_output
+read_report = Benchmark.ips(quiet: json_output) do |x|
+  x.config(time: BENCH_TIME, warmup: BENCH_WARMUP)
+
+  x.report('Ruby CSV') do |times|
+    times.times { CSV.parse(csv_string) }
   end
 
   x.report('rscsv') do |times|
     times.times { Rscsv::Reader.parse(csv_string) }
   end
 
-  x.report('osv') do |times|
-    times.times do
-      OSV.for_each(StringIO.new(csv_string), result_type: :array) { |row| row }
+  if RUBY_VERSION < '4.0'
+    x.report('osv') do |times|
+      times.times do
+        OSV.for_each(StringIO.new(csv_string), result_type: :array) { |row| row }
+      end
     end
-  end if RUBY_VERSION < '4.0'
+  end
 
   x.compare! unless json_output
 end
+results[:benchmarks][:reading] = collect_results(read_report) if json_output
 
-if json_output
-  read_results = {}
-  read_report.entries.each do |entry|
-    read_results[entry.label] = {
-      ips: entry.stats.central_tendency,
-      stddev_percentage: entry.stats.error_percentage
-    }
+# === Streaming read: chunk-by-chunk via Reader.each ===
+puts "\n=== Streaming Read Benchmark (Reader.each, single chunk) ===" unless json_output
+stream_report = Benchmark.ips(quiet: json_output) do |x|
+  x.config(time: BENCH_TIME, warmup: BENCH_WARMUP)
+
+  x.report('rscsv (each, 1 chunk)') do |times|
+    times.times do
+      count = 0
+      Rscsv::Reader.each([csv_string].each) { |_row| count += 1 }
+      count
+    end
   end
-  results[:benchmarks][:reading] = read_results
-end
 
-# Output JSON if requested
+  # Split into 16KB chunks - more realistic streaming
+  chunk_size = 16 * 1024
+  chunks = (0...csv_string.bytesize).step(chunk_size).map { |i| csv_string.byteslice(i, chunk_size) }
+
+  x.report('rscsv (each, 16KB chunks)') do |times|
+    times.times do
+      count = 0
+      Rscsv::Reader.each(chunks.each) { |_row| count += 1 }
+      count
+    end
+  end
+
+  x.compare! unless json_output
+end
+results[:benchmarks][:streaming] = collect_results(stream_report) if json_output
+
 if json_output
   puts JSON.pretty_generate(results)
 end
