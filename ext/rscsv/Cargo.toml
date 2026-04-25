@@ -8,5 +8,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-magnus = { version = "0.7", features = ["rb-sys"] }
+magnus = { version = "0.8", features = ["rb-sys"] }
 csv = "1"
