@@ -1,27 +1,27 @@
 use magnus::{
-    block::yield_value, function, prelude::*, Error, RArray, RString, Ruby, Value,
+    function, prelude::*, Error, RArray, Ruby, Value,
 };
 use std::io::Read;
 
-fn generate_lines(rows: Vec<Vec<String>>) -> Result<String, Error> {
+fn generate_lines(ruby: &Ruby, rows: Vec<Vec<String>>) -> Result<String, Error> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
     for row in rows {
         wtr.write_record(&row)
-            .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+            .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))?;
     }
 
     let inner = wtr
         .into_inner()
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+        .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))?;
 
     String::from_utf8(inner)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))
+        .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))
 }
 
-fn record_to_ruby_array(record: &csv::ByteRecord) -> Result<RArray, Error> {
-    let array = RArray::with_capacity(record.len());
+fn record_to_ruby_array(ruby: &Ruby, record: &csv::ByteRecord) -> Result<RArray, Error> {
+    let array = ruby.ary_new_capa(record.len());
     for column in record.iter() {
-        let column_str = RString::from_slice(column);
+        let column_str = ruby.str_from_slice(column);
         array.push(column_str)?;
     }
     Ok(array)
@@ -81,37 +81,37 @@ fn csv_reader<R: Read>(reader: R) -> csv::Reader<R> {
         .from_reader(reader)
 }
 
-fn yield_csv(enumerator: Value) -> Result<(), Error> {
+fn yield_csv(ruby: &Ruby, enumerator: Value) -> Result<(), Error> {
     let mut reader = csv_reader(EnumeratorRead::new(enumerator));
     let mut record = csv::ByteRecord::new();
 
     loop {
         let has_record = reader
             .read_byte_record(&mut record)
-            .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+            .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))?;
 
         if !has_record {
             break;
         }
 
-        let row_array = record_to_ruby_array(&record)?;
-        let _: Value = yield_value(row_array)?;
+        let row_array = record_to_ruby_array(ruby, &record)?;
+        let _: Value = ruby.yield_value(row_array)?;
     }
 
     Ok(())
 }
 
-fn parse_csv(data: String) -> Result<RArray, Error> {
+fn parse_csv(ruby: &Ruby, data: String) -> Result<RArray, Error> {
     let mut reader = csv_reader(data.as_bytes());
-    let result = RArray::new();
+    let result = ruby.ary_new();
 
     for record in reader.records() {
         let record = record
-            .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+            .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))?;
 
-        let row = RArray::with_capacity(record.len());
+        let row = ruby.ary_new_capa(record.len());
         for field in record.iter() {
-            row.push(RString::new(field))?;
+            row.push(ruby.str_new(field))?;
         }
         result.push(row)?;
     }
@@ -119,17 +119,17 @@ fn parse_csv(data: String) -> Result<RArray, Error> {
     Ok(result)
 }
 
-fn generate_line(row: Vec<String>) -> Result<String, Error> {
+fn generate_line(ruby: &Ruby, row: Vec<String>) -> Result<String, Error> {
     let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
     wtr.write_record(&row)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+        .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))?;
 
     let inner = wtr
         .into_inner()
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+        .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))?;
 
     String::from_utf8(inner)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))
+        .map_err(|e| Error::new(ruby.exception_runtime_error(), e.to_string()))
 }
 
 #[magnus::init]
