@@ -12,7 +12,8 @@ require 'benchmark/ips'
 require 'securerandom'
 require 'rscsv'
 require 'csv'
-require 'osv'
+
+require 'osv' if RUBY_VERSION < '4.0'
 require 'stringio'
 require 'json'
 
@@ -72,7 +73,7 @@ read_report = Benchmark.ips(quiet: json_output) do |x|
     times.times do
       OSV.for_each(StringIO.new(csv_string), result_type: :array) { |row| row }
     end
-  end
+  end if RUBY_VERSION < '4.0'
 
   x.compare! unless json_output
 end
