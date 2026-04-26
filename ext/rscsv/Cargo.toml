@@ -10,3 +10,9 @@ crate-type = ["cdylib"]
 [dependencies]
 magnus = { version = "0.8", features = ["rb-sys"] }
 csv = "1"
+csv-core = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
